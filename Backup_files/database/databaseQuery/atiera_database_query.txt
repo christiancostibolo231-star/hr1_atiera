@@ -1,0 +1,207 @@
+DROP DATABASE IF EXISTS atiera_clean;
+CREATE DATABASE atiera;
+USE atiera;
+
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- =====================================
+-- LOGIN ACCOUNTS
+-- =====================================
+CREATE TABLE login_accounts (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  account_type ENUM('admin','hr','manager','employee','applicant') DEFAULT 'applicant',
+  full_name VARCHAR(150),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- =====================================
+-- DEPARTMENTS
+-- =====================================
+CREATE TABLE departments (
+  department_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  manager_id INT UNSIGNED NULL,
+  FOREIGN KEY (manager_id) REFERENCES login_accounts(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- =====================================
+-- JOBS
+-- =====================================
+CREATE TABLE jobs (
+  job_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(150) NOT NULL,
+  department_id INT UNSIGNED,
+  description TEXT,
+  employment_type ENUM('Full-time','Part-time','Contract') NOT NULL,
+  status ENUM('Open','Closed','Pending') DEFAULT 'Open',
+  vacancies INT DEFAULT 1,
+  filled_positions INT DEFAULT 0,
+  created_by INT UNSIGNED,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE SET NULL,
+  FOREIGN KEY (created_by) REFERENCES login_accounts(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- =====================================
+-- APPLICANTS
+-- =====================================
+CREATE TABLE applicants (
+  applicant_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  first_name VARCHAR(100),
+  middle_name VARCHAR(100),
+  last_name VARCHAR(100),
+  email VARCHAR(150) UNIQUE,
+  phone VARCHAR(20),
+  address VARCHAR(255),
+  birthdate DATE,
+  gender VARCHAR(20),
+  resume_path VARCHAR(255),
+  photo_path VARCHAR(255),
+  application_date DATE DEFAULT CURRENT_DATE,
+  status ENUM('In Progress','Hired','Rejected') DEFAULT 'In Progress'
+) ENGINE=InnoDB;
+
+-- =====================================
+-- APPLICATIONS
+-- =====================================
+CREATE TABLE applications (
+  application_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  applicant_id INT UNSIGNED NOT NULL,
+  job_id INT UNSIGNED NOT NULL,
+  stage ENUM('Screening','Interview','Offer','Hired','Rejected') DEFAULT 'Screening',
+  status ENUM('Active','Hired','Rejected') DEFAULT 'Active',
+  applied_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (applicant_id) REFERENCES applicants(applicant_id) ON DELETE CASCADE,
+  FOREIGN KEY (job_id) REFERENCES jobs(job_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- =====================================
+-- INTERVIEWS
+-- =====================================
+CREATE TABLE interviews (
+  interview_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  application_id INT UNSIGNED NOT NULL,
+  interviewer_id INT UNSIGNED,
+  schedule_date DATETIME,
+  result ENUM('Pending','Passed','Failed') DEFAULT 'Pending',
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (application_id) REFERENCES applications(application_id) ON DELETE CASCADE,
+  FOREIGN KEY (interviewer_id) REFERENCES login_accounts(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- =====================================
+-- EMPLOYEES
+-- =====================================
+CREATE TABLE employees (
+  employee_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  applicant_id INT UNSIGNED,
+  first_name VARCHAR(100),
+  last_name VARCHAR(100),
+  email VARCHAR(150) UNIQUE,
+  phone VARCHAR(20),
+  hire_date DATE,
+  job_id INT UNSIGNED,
+  department_id INT UNSIGNED,
+  status ENUM('Active','Inactive','Resigned') DEFAULT 'Active',
+  FOREIGN KEY (applicant_id) REFERENCES applicants(applicant_id) ON DELETE SET NULL,
+  FOREIGN KEY (job_id) REFERENCES jobs(job_id) ON DELETE SET NULL,
+  FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- =====================================
+-- APPRAISALS
+-- =====================================
+CREATE TABLE appraisals (
+  appraisal_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  employee_id INT UNSIGNED NOT NULL,
+  reviewer_id INT UNSIGNED,
+  period_start DATE,
+  period_end DATE,
+  rating DECIMAL(3,2),
+  comments TEXT,
+  FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE,
+  FOREIGN KEY (reviewer_id) REFERENCES login_accounts(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- =====================================
+-- RECOGNITION
+-- =====================================
+CREATE TABLE recognition (
+  recognition_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  employee_id INT UNSIGNED NOT NULL,
+  given_by INT UNSIGNED NOT NULL,
+  recognition_type ENUM('Peer','Manager','Award') NOT NULL,
+  message TEXT,
+  date_given TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  points_awarded INT DEFAULT 0,
+  FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE,
+  FOREIGN KEY (given_by) REFERENCES login_accounts(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- =====================================
+-- REWARDS
+-- =====================================
+CREATE TABLE rewards (
+  reward_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  employee_id INT UNSIGNED NOT NULL,
+  reward_name VARCHAR(100),
+  points_used INT,
+  date_redeemed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- =====================================
+-- ONBOARDING
+-- =====================================
+CREATE TABLE onboarding_tasks (
+  task_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  employee_id INT UNSIGNED NOT NULL,
+  task_name VARCHAR(255),
+  assigned_to INT UNSIGNED,
+  due_date DATE,
+  status ENUM('Pending','Completed') DEFAULT 'Pending',
+  FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE,
+  FOREIGN KEY (assigned_to) REFERENCES login_accounts(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE onboarding_documents (
+  document_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  employee_id INT UNSIGNED NOT NULL,
+  doc_type VARCHAR(100),
+  file_path VARCHAR(255),
+  verified ENUM('Yes','No') DEFAULT 'No',
+  FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- =====================================
+-- FEEDBACK (Fixed Type Alignment)
+-- =====================================
+CREATE TABLE feedback (
+  feedback_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  employee_id INT UNSIGNED NOT NULL,
+  given_by INT UNSIGNED NOT NULL,
+  feedback_text TEXT,
+  feedback_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE,
+  FOREIGN KEY (given_by) REFERENCES login_accounts(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- =====================================
+-- GOALS
+-- =====================================
+CREATE TABLE goals (
+  goal_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  employee_id INT UNSIGNED NOT NULL,
+  goal_description TEXT,
+  kpi VARCHAR(255),
+  start_date DATE,
+  end_date DATE,
+  status ENUM('In Progress','Completed') DEFAULT 'In Progress',
+  FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+SET FOREIGN_KEY_CHECKS = 1;
